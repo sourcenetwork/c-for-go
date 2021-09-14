@@ -2,6 +2,7 @@ package generator
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -783,8 +784,9 @@ func (gen *Generator) proxyArgToGo(memTip tl.Tip, varName, ptrName string,
 	}
 }
 
-func (gen *Generator) proxyValueToGo(memTip tl.Tip, varName, ptrName string,
-	goSpec tl.GoTypeSpec, cgoSpec tl.CGoSpec) (proxy string, nillable bool) {
+func (gen *Generator) proxyValueToGo(ctx context.Context, index int, typeTip tl.Tip,
+	memTip tl.Tip, varName, ptrName string, goSpec tl.GoTypeSpec,
+	cgoSpec tl.CGoSpec) (proxy string, nillable bool) {
 	nillable = true
 
 	if goSpec.IsGoString() {
@@ -822,6 +824,19 @@ func (gen *Generator) proxyValueToGo(memTip tl.Tip, varName, ptrName string,
 	case isPlain && goSpec.Slices != 0: // ex: []byte, [][4]byte
 		gen.submitHelper(sliceHeader)
 		buf := new(bytes.Buffer)
+
+		// need to annotate with Len if possible from typeTip(s)
+		// check if Tip is 'arr', if so peek fwd/bwd for a 'size' tip
+		// peek forward if index is odd
+		// peek backward otherwise
+		if typeTip == tl.TipPtrArr {
+			if index%2 == 0 {
+
+			} else {
+
+			}
+		}
+
 		postfix := gen.randPostfix()
 		fmt.Fprintf(buf, "hx%2x := (*sliceHeader)(unsafe.Pointer(&%s))\n", postfix, varName)
 		fmt.Fprintf(buf, "hx%2x.Data = unsafe.Pointer(%s)\n", postfix, ptrName)

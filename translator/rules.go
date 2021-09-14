@@ -89,6 +89,7 @@ const (
 	TipPtrSRef    Tip = "sref"
 	TipPtrRef     Tip = "ref"
 	TipPtrArr     Tip = "arr"
+	TipArrSize    Tip = "size"
 	TipPtrInst    Tip = "inst"
 	TipMemRaw     Tip = "raw"
 	TipTypeNamed  Tip = "named"

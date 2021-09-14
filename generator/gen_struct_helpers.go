@@ -2,6 +2,7 @@ package generator
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"hash/crc32"
 
@@ -208,15 +209,15 @@ func (gen *Generator) getRawStructHelpers(goStructName []byte, cStructName strin
 			goSpec.Pointers += 1
 			cgoSpec.Pointers += 1
 		}
-		fmt.Fprintf(buf,"func (s *%s) Get%s() %s {\n", goStructName, goName, goSpec)
-		toProxy, _ := gen.proxyValueToGo(memTip, "ret", "&s." + m.Name, goSpec, cgoSpec)
-		fmt.Fprintf(buf,"\tvar ret %s\n", goSpec)
-		fmt.Fprintf(buf,"\t%s\n",toProxy)
+		fmt.Fprintf(buf, "func (s *%s) Get%s() %s {\n", goStructName, goName, goSpec)
+		toProxy, _ := gen.proxyValueToGo(memTip, "ret", "&s."+m.Name, goSpec, cgoSpec)
+		fmt.Fprintf(buf, "\tvar ret %s\n", goSpec)
+		fmt.Fprintf(buf, "\t%s\n", toProxy)
 		fmt.Fprintf(buf, "\treturn ret\n")
 		fmt.Fprintf(buf, "}\n")
 		helpers = append(helpers, &Helper{
-			Name:	fmt.Sprintf("%s.Get%s", goStructName, goName),
-			Description: fmt.Sprintf("Get%s returns a reference to C object within a struct",goName),
+			Name:        fmt.Sprintf("%s.Get%s", goStructName, goName),
+			Description: fmt.Sprintf("Get%s returns a reference to C object within a struct", goName),
 			Source:      buf.String(),
 		})
 	}
@@ -318,6 +319,13 @@ func (gen *Generator) getDerefSource(goStructName []byte, cStructName string, sp
 	writeSpace(buf, 1)
 
 	ptrTipRx, typeTipRx, memTipRx := gen.tr.TipRxsForSpec(tl.TipScopeType, cStructName, spec)
+
+	// create a context to pass the Tip info to sub functions
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, "ptrTipRx", ptrTipRx)
+	ctx = context.WithValue(ctx, "typeTipRx", typeTipRx)
+	ctx = context.WithValue(ctx, "memTipRx", memTipRx)
+
 	for i, m := range structSpec.Members {
 		if len(m.Name) == 0 {
 			continue
@@ -345,8 +353,9 @@ func (gen *Generator) getDerefSource(goStructName []byte, cStructName string, sp
 		goName := "x." + string(gen.tr.TransformName(tl.TargetType, m.Name, public))
 		cgoName := fmt.Sprintf("x.ref%2x.%s", crc, m.Name)
 		cgoSpec := gen.tr.CGoSpec(m.Spec, false)
-		toProxy, _ := gen.proxyValueToGo(memTip, goName, cgoName, goSpec, cgoSpec)
+		toProxy, _ := gen.proxyValueToGo(ctx, i, typeTip, memTip, goName, cgoName, goSpec, cgoSpec)
 		fmt.Fprintln(buf, toProxy)
 	}
+	ctx.Done()
 	return buf.Bytes()
 }

@@ -1,6 +1,8 @@
 package generator
 
 import (
+	"crypto/md5"
+	"encoding/binary"
 	"errors"
 	"io"
 	"math/rand"
@@ -44,9 +46,9 @@ type Config struct {
 }
 
 type GenOptions struct {
-	SafeStrings bool `yaml:"SafeStrings"`
+	SafeStrings     bool `yaml:"SafeStrings"`
 	StructAccessors bool `yaml:"StructAccessors"`
-	KeepAlive   bool `yaml:"KeepAlive"`
+	KeepAlive       bool `yaml:"KeepAlive"`
 }
 
 func New(pkg string, cfg *Config, tr *tl.Translator) (*Generator, error) {
@@ -435,7 +437,13 @@ func (gen *Generator) MonitorAndWriteHelpers(goWr, chWr io.Writer, ccWr io.Write
 }
 
 // randPostfix generates a simply random 4-byte postfix. Doesn't require a crypto package.
-func (gen *Generator) randPostfix() int32 {
+func (gen *Generator) randPostfix(seeds ...string) int32 {
+	if len(seeds) > 0 {
+		h := md5.New()
+		h.Write([]byte(seeds[0]))
+		useed := binary.BigEndian.Uint64(h.Sum(nil))
+		gen.rand.Seed(int64(useed))
+	}
 	return 0x0f000000 + gen.rand.Int31n(0x00ffffff)
 }
 
