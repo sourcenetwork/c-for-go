@@ -786,7 +786,7 @@ func (gen *Generator) proxyArgToGo(memTip tl.Tip, varName, ptrName string,
 
 func (gen *Generator) proxyValueToGo(ctx context.Context, index int, typeTip tl.Tip,
 	memTip tl.Tip, varName, ptrName string, goSpec tl.GoTypeSpec,
-	cgoSpec tl.CGoSpec) (proxy string, nillable bool) {
+	cgoSpec tl.CGoSpec, crc uint32, structSpec *tl.CStructSpec) (proxy string, nillable bool) {
 	nillable = true
 
 	if goSpec.IsGoString() {
@@ -827,17 +827,13 @@ func (gen *Generator) proxyValueToGo(ctx context.Context, index int, typeTip tl.
 
 		// need to annotate with Len if possible from typeTip(s)
 		// check if Tip is 'arr', if so peek fwd/bwd for a 'size' tip
-		// peek forward if index is odd
-		// peek backward otherwise
-		if typeTip == tl.TipPtrArr {
-			if index%2 == 0 {
-
-			} else {
-
-			}
+		var seed []string
+		if proxyValueHasArrSizeTip(ctx, typeTip, index, true) > -1 {
+			seed = append(seed, ptrName)
 		}
 
-		postfix := gen.randPostfix()
+		postfix := gen.randPostfix(seed...)
+		fmt.Fprintf(buf, "// seed: %v\n", seed)
 		fmt.Fprintf(buf, "hx%2x := (*sliceHeader)(unsafe.Pointer(&%s))\n", postfix, varName)
 		fmt.Fprintf(buf, "hx%2x.Data = unsafe.Pointer(%s)\n", postfix, ptrName)
 		fmt.Fprintf(buf, "hx%2x.Cap = %s\n", postfix, gen.maxMem)
@@ -848,7 +844,16 @@ func (gen *Generator) proxyValueToGo(ctx context.Context, index int, typeTip tl.
 		var ref, ptr string
 		if (goSpec.Kind == tl.PlainTypeKind || goSpec.Kind == tl.EnumKind) &&
 			len(goSpec.OuterArr)+len(goSpec.InnerArr) == 0 && goSpec.Pointers == 0 {
-			proxy = fmt.Sprintf("%s = (%s)(%s)", varName, goSpec, ptrName)
+
+			buf := new(bytes.Buffer)
+			if tipIndex := proxyValueHasArrSizeTip(ctx, typeTip, index, false); tipIndex > -1 {
+				ArrPtrName := fmt.Sprintf("x.ref%2x.%s", crc, structSpec.Members[tipIndex].Name)
+				postfix := gen.randPostfix([]string{ArrPtrName}...)
+				fmt.Fprintf(buf, "// seed: %v\n", ArrPtrName)
+				fmt.Fprintf(buf, "hx%2x.Len = int((%s)(%s))\n", postfix, goSpec, ptrName)
+			}
+			fmt.Fprintf(buf, "%s = (%s)(%s)", varName, goSpec, ptrName)
+			proxy = buf.String()
 			return
 		} else if goSpec.Kind == tl.FunctionKind {
 			proxy = fmt.Sprintf("// %s is a callback func", varName)
@@ -1067,6 +1072,25 @@ func (gen *Generator) writeFunctionBody(wr io.Writer, decl *tl.CDecl) {
 		fmt.Fprintln(wr, "return __v")
 	}
 	writeEndFuncBody(wr)
+}
+
+func proxyValueHasArrSizeTip(ctx context.Context, typeTip tl.Tip, index int, slice bool) int {
+	typeTipRx, ok := ctx.Value("typeTipRx").(tl.TipSpecRx)
+	checkSliceArr := slice && typeTip == tl.TipPtrArr
+	checkSliceSize := slice && typeTip == tl.TipArrSize
+
+	// fmt.Println(slice, typeTip, checkSlice)
+
+	if ok && checkSliceArr && typeTipRx.TipAt(index-1) == tl.TipArrSize {
+		return index - 1
+	} else if ok && checkSliceArr && typeTipRx.TipAt(index+1) == tl.TipArrSize {
+		return index + 1
+	} else if ok && !checkSliceSize && typeTipRx.TipAt(index-1) == tl.TipPtrArr {
+		return index - 1
+	} else if ok && !checkSliceSize && typeTipRx.TipAt(index+1) == tl.TipPtrArr {
+		return index + 1
+	}
+	return -1
 }
 
 var (

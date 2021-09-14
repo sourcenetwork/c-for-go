@@ -210,7 +210,8 @@ func (gen *Generator) getRawStructHelpers(goStructName []byte, cStructName strin
 			cgoSpec.Pointers += 1
 		}
 		fmt.Fprintf(buf, "func (s *%s) Get%s() %s {\n", goStructName, goName, goSpec)
-		toProxy, _ := gen.proxyValueToGo(memTip, "ret", "&s."+m.Name, goSpec, cgoSpec)
+		ctx := context.Background()
+		toProxy, _ := gen.proxyValueToGo(ctx, i, typeTip, memTip, "ret", "&s."+m.Name, goSpec, cgoSpec, 0, structSpec)
 		fmt.Fprintf(buf, "\tvar ret %s\n", goSpec)
 		fmt.Fprintf(buf, "\t%s\n", toProxy)
 		fmt.Fprintf(buf, "\treturn ret\n")
@@ -353,7 +354,7 @@ func (gen *Generator) getDerefSource(goStructName []byte, cStructName string, sp
 		goName := "x." + string(gen.tr.TransformName(tl.TargetType, m.Name, public))
 		cgoName := fmt.Sprintf("x.ref%2x.%s", crc, m.Name)
 		cgoSpec := gen.tr.CGoSpec(m.Spec, false)
-		toProxy, _ := gen.proxyValueToGo(ctx, i, typeTip, memTip, goName, cgoName, goSpec, cgoSpec)
+		toProxy, _ := gen.proxyValueToGo(ctx, i, typeTip, memTip, goName, cgoName, goSpec, cgoSpec, crc, structSpec)
 		fmt.Fprintln(buf, toProxy)
 	}
 	ctx.Done()

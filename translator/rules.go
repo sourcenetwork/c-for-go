@@ -122,7 +122,7 @@ func (t Tip) Kind() TipKind {
 
 func (t Tip) IsValid() bool {
 	switch t {
-	case TipPtrArr, TipPtrRef, TipPtrSRef, TipPtrInst:
+	case TipPtrArr, TipArrSize, TipPtrRef, TipPtrSRef, TipPtrInst:
 		return true
 	case TipTypePlain, TipTypeNamed, TipTypeString:
 		return true

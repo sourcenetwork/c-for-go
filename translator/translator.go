@@ -65,7 +65,7 @@ type TipSpecRx struct {
 }
 
 func (t TipSpecRx) TipAt(i int) Tip {
-	if i < len(t.tips) {
+	if 0 <= i && i < len(t.tips) {
 		if tip := t.tips[i]; tip.IsValid() {
 			return tip
 		}
